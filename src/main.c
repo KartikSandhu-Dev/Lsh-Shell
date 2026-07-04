@@ -1,6 +1,7 @@
-#include "shell.h"
+#include <shell.h>
 
-int main() {
+int main(void)
+{
 	shell_init();
 	return 0;
 }

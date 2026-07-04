@@ -1,8 +1,18 @@
-#include "lexer.h"
-#include <ctype.h>
-#include <stdio.h>
-#include <stdbool.h>
-#include <string.h>
+#include <lexer.h>
+#include <config.h>
+#include <common.h>
+
+static char current(Lexer *lex) {
+	return lex->source[lex->pos];
+}
+
+static void advance(Lexer *lex) {
+	lex->pos++;
+}
+
+static char peek(Lexer *lex) {
+	return lex->source[lex->pos + 1];
+}
 
 TokenList tokenize(const char *buffer) {
 	Lexer lex = {0};
@@ -10,7 +20,7 @@ TokenList tokenize(const char *buffer) {
 	lex.pos = 0;
 
 	TokenList token_list = {0};
-	token_list.capacity = DEF_TOKEN_CAPACITY;
+	token_list.capacity = MAX_ARGS;
 	token_list.count = 0;
 	token_list.tokens = malloc(sizeof(Token) * token_list.capacity);
 
@@ -33,7 +43,7 @@ TokenList tokenize(const char *buffer) {
 }
 
 static bool not_special_char(char input) {
-	char special_char[] = {'|', '>', '<', '&', '\0', '\n'};
+	char special_char[] = {'|', '>', '<', '&', '\0', '\n', '\t'};
 
 	bool not_special = true;
 	for(int i = 0; i < (int)sizeof(special_char); i++) {
@@ -55,7 +65,7 @@ Token next_token(Lexer *lex) {
 	Token token = {0};
 	switch (current(lex)) {
 		case '|':
-			token.token_type = TOKN_PIPE;
+			token.token_type = TOKEN_PIPE;
 			break;
 		case '>':
 			if(peek(lex) == '>') {
@@ -85,7 +95,6 @@ Token next_token(Lexer *lex) {
 
 		default:
 			fprintf(stderr, "Used unexpected token %c", current(lex));
-			exit(1);
 			break;
 	}
 	advance(lex);
@@ -97,18 +106,6 @@ void skip_whitespace(Lexer *lex) {
 	while(isspace(lex->source[lex->pos])) {
 		lex->pos++;
 	}
-}
-
-char current(Lexer *lex) {
-	return lex->source[lex->pos];
-}
-
-void advance(Lexer *lex) {
-	lex->pos++;
-}
-
-char peek(Lexer *lex) {
-	return lex->source[lex->pos + 1];
 }
 
 static char *strip_quotes(char *input, size_t len) {
@@ -190,7 +187,7 @@ void print_tokens(TokenList *token_list) {
             case TOKEN_WORD:
             	printf("WORD(%s)\n", token_list->tokens[pos].value);
             	break;
-            case TOKN_PIPE:
+            case TOKEN_PIPE:
             	printf("PIPE(|)\n");
             	break;
             case TOKEN_REDIR_IN:

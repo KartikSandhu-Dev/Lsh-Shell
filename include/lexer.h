@@ -3,8 +3,6 @@
 
 #include <stdlib.h>
 
-#define DEF_TOKEN_CAPACITY 20
-
 typedef struct Lexer {
 	const char *source;
 	size_t pos;
@@ -12,7 +10,7 @@ typedef struct Lexer {
 
 typedef enum TokenType {
 	TOKEN_WORD, // echo cat ls
-	TOKN_PIPE,	// |
+	TOKEN_PIPE,	// |
 	TOKEN_REDIR_IN, // <
 	TOKEN_REDIR_OUT, // >
 	TOKEN_APPEND, // >>
@@ -35,10 +33,6 @@ typedef struct TokenList {
 TokenList tokenize(const char *buffer);
 
 Token next_token(Lexer *lex);
-
-char current(Lexer *lex);
-void advance(Lexer *lex);
-char peek(Lexer *lex);
 
 void skip_whitespace(Lexer *lex);
 Token read_word(Lexer *lex);
