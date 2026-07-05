@@ -30,7 +30,7 @@ typedef struct TokenList {
 	size_t capacity;
 } TokenList;
 
-TokenList tokenize(const char *buffer);
+TokenList *tokenize(const char *buffer);
 
 Token next_token(Lexer *lex);
 

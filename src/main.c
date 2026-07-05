@@ -1,7 +1,7 @@
-#include <shell.h>
+#include "shell.h"
 
-int main(void)
+int main(int argc, char *argv[], char *envp[])
 {
-	shell_init();
+	shell_init(envp);
 	return 0;
 }

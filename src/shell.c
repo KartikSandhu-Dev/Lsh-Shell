@@ -1,13 +1,16 @@
-#include <shell.h>
-#include <config.h>
-#include <common.h>
-#include <lexer.h>
+#include "shell.h"
+#include "var/config.h"
+#include "var/common.h"
+
+#include "lexer.h"
+#include "parser.h"
+#include "execute.h"
 
 #include <unistd.h>
 #include <sys/wait.h>
 #include <linux/limits.h>
 
-void shell_init() {
+void shell_init(char **envp) {
 	char shell_buffer[SHELL_BUFFER_LEN];
 
 	while(1) {
@@ -16,10 +19,14 @@ void shell_init() {
 		char *line = read_line(shell_buffer, sizeof(shell_buffer));
 		if(line[0] == '\0' || !line) { continue; }
 
-		TokenList token_list = tokenize(shell_buffer);
+		TokenList *token_list = tokenize(shell_buffer);
 
-		print_tokens(&token_list);
-		clean_tokens(&token_list);
+		ASTNode *cmd = parse_tokens(token_list);
+
+		execute(cmd, envp);
+
+		clean_ASTs(cmd);
+		clean_tokens(token_list); 
 	}
 }
 
@@ -40,7 +47,7 @@ void print_prompt() {
 	fflush(stdout);
 }
 
-char *read_line(char *buffer, int buffer_len) {
+char *read_line(char *buffer, const int buffer_len) {
 	char *input = fgets(buffer, buffer_len, stdin);
 
 	if (!input) { return NULL; }

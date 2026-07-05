@@ -1,9 +1,7 @@
 #include "lexer.h"
-#include <parser.h>
-#include <common.h>
-#include <config.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include "parser.h"
+#include "var/config.h"
+#include "var/common.h"
 
 static Token current(Parser *p) {
 	return p->token_list.tokens[p->pos];
@@ -50,7 +48,7 @@ ASTNode *parse_command(Parser *p) {
 	}
 	node->Command.argv[node->Command.argc] = NULL;
 
-	while(current(p).token_type == TOKEN_REDIR_IN ||
+	while(current(p).token_type == TOKEN_REDIR_IN || 
 		  current(p).token_type == TOKEN_REDIR_OUT ||
 		  current(p).token_type == TOKEN_APPEND) {
 
@@ -134,16 +132,61 @@ ASTNode *parse_pipe(Parser *p) {
 	return left;
 }
 
-void print_ASts(ASTNode *node) {
+void clean_ASTs(ASTNode *node) {
+	if(!node) { return; }
+
 	switch (node->ast_type) {
 		case NODE_COMMAND:
-
+			free_command(node);
+			break;
 		case NODE_PIPE:
-
+			clean_ASTs(node->Binary.left);
+			clean_ASTs(node->Binary.right);
+			free(node);
+			break;
 		case NODE_AND:
+			clean_ASTs(node->Binary.left);
+			clean_ASTs(node->Binary.right);
+			free(node);
+			break;
+	}
+}
 
-		case NODE_REDIR:
+static void print_indent(int indent) {
+	for(int i = 0; i < indent; i++) {
+		printf("   ");
+	}
 
+}
+
+void print_ASTs(ASTNode *node, int indent) {
+	if(!node) { return; }
+
+	print_indent(indent);
+
+	switch (node->ast_type) {
+		case NODE_COMMAND:
+			printf("Command\n");
+			print_indent(indent + 1);
+			printf("argv:\n");
+
+			size_t pos = 0;
+			while(node->Command.argv[pos] != NULL) {
+				print_indent(indent + 2);
+				printf("%s\n", node->Command.argv[pos]);
+				pos++;
+			}
+
+			break;
+		case NODE_PIPE:
+			printf("Pipe\n");
+			print_ASTs(node->Binary.left, indent + 1);
+			print_ASTs(node->Binary.right, indent + 1);
+			break;
+		case NODE_AND:
+			printf("And\n");
+			print_ASTs(node->Binary.left, indent + 1);
+			print_ASTs(node->Binary.right, indent + 1);
 			break;
 	}
 }

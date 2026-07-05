@@ -1,7 +1,8 @@
 #ifndef PARSER_H
 #define PARSER_H
 
-#include <lexer.h>
+#include "lexer.h"
+#include <stdlib.h>
 
 typedef struct ASTNode ASTNode;
 
@@ -14,7 +15,6 @@ typedef enum ASTtype {
 	NODE_COMMAND,
 	NODE_PIPE,
 	NODE_AND,
-	NODE_REDIR,
 } ASTtype;
 
 typedef enum RedirType {
@@ -55,6 +55,6 @@ ASTNode *parse_and(Parser *parser);
 ASTNode *parse_pipe(Parser *parser);
 
 void clean_ASTs(ASTNode *node);
-void print_ASts(ASTNode *node);
+void print_ASTs(ASTNode *node, int indent);
 
 #endif
