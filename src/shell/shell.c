@@ -1,4 +1,5 @@
 #include "shell/shell.h"
+
 #include "var/config.h"
 #include "var/common.h"
 
@@ -7,31 +8,36 @@
 #include "shell/history.h"
 #include "exec/execute.h"
 
-
-#include <unistd.h>
-#include <sys/wait.h>
 #include <linux/limits.h>
+#include <unistd.h>
 
 void shell_init(char **envp) {
-	Shell shell;
+	char shell_buffer[SHELL_BUFFER_LEN];
 	history_init();
 
+	// MAIN SHELL LOOP 
 	while(1) {
+		// print prompt
 		print_prompt();
-
-		char *line = read_line(shell.buffer, sizeof(shell.buffer));
-		if(line[0] == '\0' || !line) { continue; }
-
-		history_add(line);
-
-		shell.token_list = tokenize(shell.buffer);
 		
-		shell.ast = parse_tokens(&shell.token_list);
+		// read line
+		int len = read_line(shell_buffer, sizeof(shell_buffer));
+		if(len <= 0) { continue; }
 
-		execute(shell.ast, envp);
+		history_add(shell_buffer); // add the line to history
 
-		clean_ASTs(shell.ast);
-		clean_tokens(&shell.token_list); 
+		// tokenise
+		TokenList token_list = tokenize(shell_buffer);
+
+		// parse
+		ASTNode *ast = parse_tokens(&token_list);
+
+		// execute
+		execute(ast, envp);
+
+		// cleanup
+		clean_ASTs(ast);
+		clean_tokens(&token_list); 
 	}
 }
 
@@ -52,12 +58,16 @@ void print_prompt() {
 	fflush(stdout);
 }
 
-char *read_line(char *buffer, const int buffer_len) {
-	char *input = fgets(buffer, buffer_len, stdin);
+int read_line(char *buffer, const int buffer_len) {
+	int len = read(STDIN_FILENO, buffer, buffer_len);
 
-	if (!input) { return NULL; }
+	if(len <= 0) { return -1; }
 
-	buffer[strcspn(buffer, "\n")] = '\0';
+	if(buffer[len - 1] == '\n') {
+		len--;
+	}
 
-	return buffer;
+	buffer[len] = '\0';
+
+	return len;
 }

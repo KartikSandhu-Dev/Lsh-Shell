@@ -2,7 +2,6 @@
 #include "parse/parser.h"
 #include "var/config.h"
 #include "var/common.h"
-#include <string.h>
 
 static Token current(Parser *p) {
 	return p->token_list.tokens[p->pos];
@@ -182,6 +181,7 @@ void print_ASTs(ASTNode *node, int indent) {
 	switch (node->ast_type) {
 		case NODE_COMMAND:
 			printf("Command\n");
+			// printf("Command\n");
 			print_indent(indent + 1);
 			printf("argv:\n");
 

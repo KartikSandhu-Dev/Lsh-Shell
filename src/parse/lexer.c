@@ -1,6 +1,7 @@
 #include "parse/lexer.h"
 #include "var/common.h"
 #include "var/config.h"
+#include <unistd.h>
 
 static char current(Lexer *lex) {
 	return lex->source[lex->pos];

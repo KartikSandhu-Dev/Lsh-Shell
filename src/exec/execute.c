@@ -1,6 +1,7 @@
 #include "exec/execute.h"
 #include "exec/builtin.h"
 #include "parse/parser.h"
+
 #include "var/common.h"
 #include "shell/expand.h"
 
@@ -15,6 +16,7 @@
 
 int execute(ASTNode *node, char **envp) {
 	if(!node) { return 1;}
+	// execution recursive loop
 
 	switch (node->ast_type) {
 		case NODE_COMMAND:
@@ -30,6 +32,7 @@ int execute(ASTNode *node, char **envp) {
 }
 
 char *resolve_path(const char *command_name) {
+	// if "./" or "../" or "/some/etc" and executable return the filepath
 	if(strncmp(command_name, "./", 2) == 0 ||
 		strncmp(command_name, "../", 3) == 0 ||
 		strncmp(command_name, "/", 1) == 0) {
@@ -42,6 +45,7 @@ char *resolve_path(const char *command_name) {
 		}
 	}
 
+	// if not starts with either of those and like "ls" search in path
 	const char *PATH = getenv("PATH");
 	char *path = strdup(PATH);
 
@@ -50,9 +54,11 @@ char *resolve_path(const char *command_name) {
 	while(dir != NULL) {
 		char candidate[PATH_MAX];
 
+		// path + command_name
 		snprintf(candidate, sizeof(candidate), 
 			"%s/%s", dir, command_name);
 
+		// if executable return
 		if(access(candidate, X_OK) == 0) {
 			free(path);
 			return strdup(candidate);
@@ -73,11 +79,14 @@ static void execute_redir(ASTNode *node, char *path, char **envp) {
 			int oflags;
 
 			if(node->Command.redirs[i].type == REDIR_APPEND ) {
+				// if ">>" append to the filepath or create if not present
 				oflags = O_WRONLY | O_APPEND | O_CREAT;
 			} else {
+				// else if ">" "<" truncate and write to the file
 				oflags = O_WRONLY | O_CREAT | O_TRUNC;
 			}
 
+			// open the file in the filepath
 			int fd = open(node->Command.redirs[i].file, oflags, 0644);
 			if(fd == -1) { perror("open"); exit(EXIT_FAILURE); }
 
@@ -91,19 +100,21 @@ static void execute_redir(ASTNode *node, char *path, char **envp) {
 
 int execute_command(ASTNode *node, char **envp) {
 	BuiltIn builtin = find_builtin(node->Command.argv[0]);
-
+	// if the command is builtin, execute it
 	if(builtin.name != NULL) {
 		return builtin.func(node);
 	}
 
-	pid_t pid = fork();
+	pid_t pid = fork(); // make child process
 
 	if(pid == 0) {
-		char *path = resolve_path(node->Command.argv[0]);
-		if(!path) { exit(EXIT_FAILURE); }
+		char *path = resolve_path(node->Command.argv[0]); // find the executable in the path
+		if(!path) { exit(EXIT_FAILURE); } 
 
+		// check for redirs, if present execute them
 		execute_redir(node, path, envp);
 
+		// if no redir execute normally
 		execve(path, node->Command.argv, envp);
 
 		perror("execve");
@@ -111,7 +122,7 @@ int execute_command(ASTNode *node, char **envp) {
 	}
 
 	int status;
-	waitpid(pid, &status, 0);
+	waitpid(pid, &status, 0); // wait for the child
 
 	return WEXITSTATUS(status);
 }
@@ -130,8 +141,9 @@ int execute_pipe(ASTNode *node, char **envp) {
 		close(fd[0]);
 		close(fd[1]);
 
+		// child process inside another child process
 		int exec1 = execute(node->Binary.left, envp);
-		exit(exec1);
+		exit(exec1); // thats why need to exit
 	}
 
 	pid_t right = fork();
@@ -150,6 +162,7 @@ int execute_pipe(ASTNode *node, char **envp) {
 
 	int left_status, right_status;
 
+	// wait for both child processes to end
 	waitpid(left, &left_status, 0);
 	waitpid(right, &right_status, 0);
 
