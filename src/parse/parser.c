@@ -32,6 +32,7 @@ static void free_command(ASTNode *node) {
 	pos = 0;
 	while(pos < node->Command.redir_count) {
 		free(node->Command.redirs->file);
+		pos++;
 	}
 
 	free(node->Command.argv);
@@ -93,7 +94,6 @@ ASTNode *parse_command(Parser *p) {
         	r.file = strdup(current(p).value);
         } else {
         	fprintf(stderr, "No filepath after redirection\n");
-        	free_command(node);
         	return NULL;
         }
 

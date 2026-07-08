@@ -1,19 +1,21 @@
 #include "shell/shell.h"
+#include "shell/variable.h"
+#include "shell/history.h"
 
 #include "var/config.h"
-#include "var/common.h"
-
 #include "parse/lexer.h"
 #include "parse/parser.h"
-#include "shell/history.h"
 #include "exec/execute.h"
 
 #include <linux/limits.h>
 #include <unistd.h>
 
 void shell_init(char **envp) {
-	char shell_buffer[SHELL_BUFFER_LEN];
-	history_init();
+	Shell shell;
+
+	shell.envp = duplicate_env(envp);
+	history_init(&shell);
+	shell_var_init(&shell);
 
 	// MAIN SHELL LOOP 
 	while(1) {
@@ -21,19 +23,19 @@ void shell_init(char **envp) {
 		print_prompt();
 		
 		// read line
-		int len = read_line(shell_buffer, sizeof(shell_buffer));
+		int len = read_line(shell.shell_buffer, sizeof(shell.shell_buffer));
 		if(len <= 0) { continue; }
 
-		history_add(shell_buffer); // add the line to history
+		history_add(&shell); // add the line to history
 
 		// tokenise
-		TokenList token_list = tokenize(shell_buffer);
+		TokenList token_list = tokenize(shell.shell_buffer);
 
 		// parse
 		ASTNode *ast = parse_tokens(&token_list);
 
 		// execute
-		execute(ast, envp);
+		shell.last_status = execute(ast, &shell);
 
 		// cleanup
 		clean_ASTs(ast);
@@ -44,15 +46,14 @@ void shell_init(char **envp) {
 void print_prompt() {
 	char cwd[PATH_MAX];
 	getcwd(cwd, sizeof(cwd));
-
 	const char *home = getenv("HOME");
 
-	printf("%s@", SHELL_NAME);
-
-	if(strncmp(cwd, home, strlen(home)) == 0) {
-		printf("~%s$ ", cwd + strlen(home));
+	// "eternal" in red, "@" in white, path in blue, "$" in white
+	printf("\033[31m%s\033[37m@", SHELL_NAME);
+	if (strncmp(cwd, home, strlen(home)) == 0) {
+		printf("\033[34m~%s\033[37m$\033[0m ", cwd + strlen(home));
 	} else {
-		printf("~%s$ ", cwd);
+		printf("\033[34m~%s\033[37m$\033[0m ", cwd);
 	}
 
 	fflush(stdout);
@@ -63,9 +64,7 @@ int read_line(char *buffer, const int buffer_len) {
 
 	if(len <= 0) { return -1; }
 
-	if(buffer[len - 1] == '\n') {
-		len--;
-	}
+	if(buffer[len - 1] == '\n') { len--; }
 
 	buffer[len] = '\0';
 

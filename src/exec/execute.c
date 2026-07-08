@@ -3,7 +3,9 @@
 #include "parse/parser.h"
 
 #include "var/common.h"
-#include "shell/expand.h"
+#include "shell/variable.h"
+#include "shell/variable.h"
+#include "shell/shell.h"
 
 #include <linux/limits.h>
 #include <string.h>
@@ -14,24 +16,24 @@
 #include <fcntl.h>
 #include <errno.h>
 
-int execute(ASTNode *node, char **envp) {
+int execute(ASTNode *node, Shell *shell) {
 	if(!node) { return 1;}
 	// execution recursive loop
 
 	switch (node->ast_type) {
 		case NODE_COMMAND:
-			if(expand_variables(node) == 1) { return 1; };
-			return execute_command(node, envp);
+			if(expand_variables(shell, node) == 1) { return 1; };
+			return execute_command(node, shell);
 		case NODE_PIPE:
-			return execute_pipe(node, envp);
+			return execute_pipe(node, shell);
 		case NODE_AND:
-			return execute_and(node, envp);
+			return execute_and(node, shell);
 		default:
 			return 1;
 	}
 }
 
-char *resolve_path(const char *command_name) {
+char *resolve_path(Shell *shell, const char *command_name) {
 	// if "./" or "../" or "/some/etc" and executable return the filepath
 	if(strncmp(command_name, "./", 2) == 0 ||
 		strncmp(command_name, "../", 3) == 0 ||
@@ -46,7 +48,7 @@ char *resolve_path(const char *command_name) {
 	}
 
 	// if not starts with either of those and like "ls" search in path
-	const char *PATH = getenv("PATH");
+	const char *PATH = get_env_value(shell, "PATH");
 	char *path = strdup(PATH);
 
 	char *dir = strtok(path, ":");
@@ -73,7 +75,7 @@ char *resolve_path(const char *command_name) {
 	return NULL;
 }
 
-static void execute_redir(ASTNode *node, char *path, char **envp) {
+static void execute_redir(ASTNode *node, char *path, Shell *shell) {
 	if(node->Command.redir_count > 0) {
 		for(size_t i = 0; i < node->Command.redir_count; i++) {
 			int oflags;
@@ -93,29 +95,58 @@ static void execute_redir(ASTNode *node, char *path, char **envp) {
 			dup2(fd, STDOUT_FILENO);
 			close(fd);
 
-			execve(path, node->Command.argv, envp);
+			execve(path, node->Command.argv, shell->envp);
 		}
 	}
 }
 
-int execute_command(ASTNode *node, char **envp) {
+static bool is_assignment(const char *str) {
+	char *equal = strchr(str, '=');
+
+	if(!equal) { return false; }
+
+	if(equal == str) { return false; }
+
+	return true;
+}
+
+static bool execute_assingment(ASTNode *node, Shell *shell) {
+	char *equal = strchr(node->Command.argv[0], '=');
+	*equal = '\0';
+
+	ShellVar var = {0};
+	var.name = node->Command.argv[0];
+	var.value = equal + 1;
+	var.exported = false;
+
+	add_shell_var(shell, var);
+
+	*equal = '=';
+	return 0;
+}
+
+int execute_command(ASTNode *node, Shell *shell) {
 	BuiltIn builtin = find_builtin(node->Command.argv[0]);
 	// if the command is builtin, execute it
 	if(builtin.name != NULL) {
-		return builtin.func(node);
+		return builtin.func(node, shell);
+	}
+
+	if(is_assignment(node->Command.argv[0])) {
+		return execute_assingment(node, shell);
 	}
 
 	pid_t pid = fork(); // make child process
 
 	if(pid == 0) {
-		char *path = resolve_path(node->Command.argv[0]); // find the executable in the path
+		char *path = resolve_path(shell, node->Command.argv[0]); // find the executable in the path
 		if(!path) { exit(EXIT_FAILURE); } 
 
 		// check for redirs, if present execute them
-		execute_redir(node, path, envp);
+		execute_redir(node, path, shell);
 
 		// if no redir execute normally
-		execve(path, node->Command.argv, envp);
+		execve(path, node->Command.argv, shell->envp);
 
 		perror("execve");
 		exit(EXIT_FAILURE);
@@ -127,7 +158,7 @@ int execute_command(ASTNode *node, char **envp) {
 	return WEXITSTATUS(status);
 }
 
-int execute_pipe(ASTNode *node, char **envp) {
+int execute_pipe(ASTNode *node, Shell *shell) {
 	int fd[2];
 	if (pipe(fd) == -1) {
 	    perror("pipe");
@@ -142,7 +173,7 @@ int execute_pipe(ASTNode *node, char **envp) {
 		close(fd[1]);
 
 		// child process inside another child process
-		int exec1 = execute(node->Binary.left, envp);
+		int exec1 = execute(node->Binary.left, shell);
 		exit(exec1); // thats why need to exit
 	}
 
@@ -153,7 +184,7 @@ int execute_pipe(ASTNode *node, char **envp) {
 		close(fd[0]);
 		close(fd[1]);
 
-		int exec2 = execute(node->Binary.right, envp);
+		int exec2 = execute(node->Binary.right, shell);
 		exit(exec2);
 	}
 
@@ -170,11 +201,11 @@ int execute_pipe(ASTNode *node, char **envp) {
 
 }
 
-int execute_and(ASTNode *node, char **envp) {
-	int status = execute(node->Binary.left, envp);
+int execute_and(ASTNode *node, Shell *shell) {
+	int status = execute(node->Binary.left, shell);
 
 	if(status == 0) {
-		return execute(node->Binary.right, envp);
+		return execute(node->Binary.right, shell);
 	}
 
 	return 1;

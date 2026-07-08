@@ -6,7 +6,6 @@ SRC = src/main.c \
       src/parse/parser.c \
       src/shell/shell.c \
       src/shell/variable.c \
-      src/shell/expand.c \
       src/shell/history.c \
       src/exec/execute.c \
       src/exec/builtin.c 
@@ -24,10 +23,11 @@ $(TARGET): $(OBJ)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 run: $(TARGET)
-	@./$(TARGET)
+	@sudo cp eternal /usr/local/bin/
 
 clean:
 	@echo "CLEANED"
+	@sudo rm /usr/local/bin/$(TARGET)
 	@rm -f $(OBJ) $(TARGET)
 
 .PHONY: all run clean
