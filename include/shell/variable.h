@@ -9,7 +9,6 @@ typedef struct Shell Shell ;
 typedef struct ShellVar {
 	char *name;
 	char *value;
-	bool exported;
 } ShellVar;
 
 typedef struct ShellVarList {
@@ -29,5 +28,7 @@ int unset_env_value(Shell *shell, const char *name);
 char *get_shell_var(Shell *shell, char *name);
 int add_shell_var(Shell *shell, ShellVar shell_var);
 int update_shell_var(Shell *shell, ShellVar shell_var);
+
+void add_last_status(Shell *shell);
 
 #endif

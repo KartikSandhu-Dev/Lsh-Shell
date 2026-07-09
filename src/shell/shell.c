@@ -8,16 +8,26 @@
 #include "exec/execute.h"
 
 #include <linux/limits.h>
+#include <stdio.h>
 #include <unistd.h>
 
 void shell_init(char **envp) {
-	Shell shell;
+	Shell shell; 
 
+	// give shell its values
 	shell.envp = duplicate_env(envp);
 	history_init(&shell);
 	shell_var_init(&shell);
 
-	// MAIN SHELL LOOP 
+	// set env variables for the shell
+	char shlvl[16];
+	snprintf(shlvl, sizeof(shlvl), "%d", atoi(get_env_value(&shell, "SHLVL")) + 1);
+
+	set_env_value(&shell, "SHELL", SHELL_LOCATION);
+	set_env_value(&shell, "SHLVL", shlvl);
+	set_env_value(&shell, "OLDPWD", "/");
+
+	// ------MAIN SHELL LOOP--------
 	while(1) {
 		// print prompt
 		print_prompt();
@@ -37,9 +47,12 @@ void shell_init(char **envp) {
 		// execute
 		shell.last_status = execute(ast, &shell);
 
+		// add last status of the process to the "?" named shell variable
+		add_last_status(&shell);
+
 		// cleanup
 		clean_ASTs(ast);
-		clean_tokens(&token_list); 
+		clean_tokens(&token_list);
 	}
 }
 

@@ -8,6 +8,7 @@
 #include "shell/shell.h"
 
 #include <linux/limits.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -75,33 +76,58 @@ char *resolve_path(Shell *shell, const char *command_name) {
 	return NULL;
 }
 
-static void execute_redir(ASTNode *node, char *path, Shell *shell) {
+static int *apply_redir(ASTNode *node, Shell *shell) {
+	int *prev_fd = malloc(sizeof(int) *2);
+
+	prev_fd[1] = dup(STDOUT_FILENO);
+	prev_fd[0] = dup(STDIN_FILENO);
+
 	if(node->Command.redir_count > 0) {
 		for(size_t i = 0; i < node->Command.redir_count; i++) {
 			int oflags;
+			int fd_change;
 
-			if(node->Command.redirs[i].type == REDIR_APPEND ) {
-				// if ">>" append to the filepath or create if not present
-				oflags = O_WRONLY | O_APPEND | O_CREAT;
-			} else {
-				// else if ">" "<" truncate and write to the file
-				oflags = O_WRONLY | O_CREAT | O_TRUNC;
+			switch (node->Command.redirs[i].type) {
+				case REDIR_IN:
+					// if "<" read only
+					oflags = O_RDONLY;
+					fd_change = STDIN_FILENO;
+					break;
+				case REDIR_OUT:
+					// if if ">" truncate and write to the file
+					oflags = O_WRONLY | O_CREAT | O_TRUNC;
+					fd_change = STDOUT_FILENO;
+					break;
+				case REDIR_APPEND:
+					// if ">>" append to the file or create if not present
+					oflags = O_WRONLY | O_APPEND | O_CREAT;
+					fd_change = STDOUT_FILENO;
+					break;
 			}
 
 			// open the file in the filepath
 			int fd = open(node->Command.redirs[i].file, oflags, 0644);
-			if(fd == -1) { perror("open"); exit(EXIT_FAILURE); }
+			if(fd == -1) { perror("open"); return NULL; }
 
-			dup2(fd, STDOUT_FILENO);
+			dup2(fd, fd_change);
 			close(fd);
-
-			execve(path, node->Command.argv, shell->envp);
 		}
 	}
+
+	return prev_fd;
+}
+
+static void reset_redir(int *fd) {
+	dup2(fd[0], STDIN_FILENO);
+	dup2(fd[1], STDOUT_FILENO);
+
+	close(fd[0]);
+	close(fd[1]);
+	free(fd);
 }
 
 static bool is_assignment(const char *str) {
-	char *equal = strchr(str, '=');
+	char *equal = strchr(str, '='); // if string contains '=' its assignment
 
 	if(!equal) { return false; }
 
@@ -110,18 +136,27 @@ static bool is_assignment(const char *str) {
 	return true;
 }
 
-static bool execute_assingment(ASTNode *node, Shell *shell) {
-	char *equal = strchr(node->Command.argv[0], '=');
-	*equal = '\0';
+static int add_assingment(ASTNode *node, Shell *shell) {
+	int pos = 0;
+	while(node->Command.argv[pos]) {
+		if(!is_assignment(node->Command.argv[pos])) {
+			fprintf(stderr, "Used something other than assingment in command\n");
+			return 1;
+		}
 
-	ShellVar var = {0};
-	var.name = node->Command.argv[0];
-	var.value = equal + 1;
-	var.exported = false;
+		char *equal = strchr(node->Command.argv[pos], '=');
+		*equal = '\0';
 
-	add_shell_var(shell, var);
+		ShellVar var = {0};
+		var.name = strdup(node->Command.argv[pos]);
+		var.value = strdup(equal + 1);
 
-	*equal = '=';
+		add_shell_var(shell, var);
+
+		*equal = '=';
+		pos++;
+	}
+
 	return 0;
 }
 
@@ -129,12 +164,20 @@ int execute_command(ASTNode *node, Shell *shell) {
 	BuiltIn builtin = find_builtin(node->Command.argv[0]);
 	// if the command is builtin, execute it
 	if(builtin.name != NULL) {
-		return builtin.func(node, shell);
+		// if redir apply redir (makes stdout fd something else)
+		int *fd = apply_redir(node, shell);
+		int status = builtin.func(node, shell);
+
+		reset_redir(fd); // reset stdout fd after executing func
+		return status;
 	}
 
+	// if the command is an assignment, execute it
 	if(is_assignment(node->Command.argv[0])) {
-		return execute_assingment(node, shell);
+		return add_assingment(node, shell);
 	}
+
+	// if none of the above find in PATH
 
 	pid_t pid = fork(); // make child process
 
@@ -143,7 +186,7 @@ int execute_command(ASTNode *node, Shell *shell) {
 		if(!path) { exit(EXIT_FAILURE); } 
 
 		// check for redirs, if present execute them
-		execute_redir(node, path, shell);
+		if(!apply_redir(node, shell)) { exit(EXIT_FAILURE); };
 
 		// if no redir execute normally
 		execve(path, node->Command.argv, shell->envp);
@@ -159,7 +202,7 @@ int execute_command(ASTNode *node, Shell *shell) {
 }
 
 int execute_pipe(ASTNode *node, Shell *shell) {
-	int fd[2];
+	int fd[2]; // fd[0] -> reading end, fd[1] -> writing end
 	if (pipe(fd) == -1) {
 	    perror("pipe");
 	    return 1;

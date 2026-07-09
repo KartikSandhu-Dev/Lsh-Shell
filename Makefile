@@ -27,7 +27,7 @@ run: $(TARGET)
 
 clean:
 	@echo "CLEANED"
-	@sudo rm /usr/local/bin/$(TARGET)
 	@rm -f $(OBJ) $(TARGET)
+	@sudo rm /usr/local/bin/$(TARGET)
 
 .PHONY: all run clean

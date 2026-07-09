@@ -2,11 +2,13 @@
 #include "var/config.h"
 #include "var/common.h"
 #include "shell/shell.h"
+#include <stdio.h>
+#include <string.h>
 
 void shell_var_init(Shell *shell) {
 	shell->vars.capacity = SHELL_VAR_CAPACITY;
 	shell->vars.count = 0;
-	shell->vars.s_vars = malloc(sizeof(ShellVar) * shell->vars.capacity);
+	shell->vars.s_vars = calloc(sizeof(ShellVar) * shell->vars.capacity, sizeof(shell->vars.capacity));
 }
 
 int expand_variables(Shell *shell, ASTNode *node) {
@@ -27,12 +29,11 @@ int expand_variables(Shell *shell, ASTNode *node) {
 			} else {
 			    node->Command.argv[pos] = strdup("");
 			    fprintf(stderr, "Unknown variable: %s does not exist\n", name);
+			    free(name);
 			    return 1;
 			}
-
 			free(name);
 		}
-
 		pos++;
 	}
 	return 0;
@@ -50,8 +51,7 @@ char **duplicate_env(char **envp) {
 	if (!new_env) { return NULL; }
 
 	// copy each string
-	while (pos < count)
-	{
+	while (pos < count) {
 		new_env[pos] = strdup(envp[pos]);
 		if (!new_env[pos]) {
 			// free already copied strings if malloc fails
@@ -77,7 +77,6 @@ char *get_env_value(Shell *shell, const char *name) {
 	int pos = 0;
 
 	while(shell->envp[pos]) {
-
 		if(strncmp(shell->envp[pos], name, len) == 0 && shell->envp[pos][len] == '=') {
 			return (shell->envp[pos] + len + 1);
 		}
@@ -103,25 +102,27 @@ int set_env_value(Shell *shell, const char *name, const char *value) {
 	snprintf(new_var, new_len, "%s=%s", name, value);
 
 	while(shell->envp[pos]) {
-
 		if(strncmp(shell->envp[pos], name, len) == 0 && shell->envp[pos][len] == '=') {
-			free(shell->envp[pos]);			
+			free(shell->envp[pos]);
 			shell->envp[pos] = new_var;
 
 			return 0;
 		}
+
 		pos++;
 	}
 
 	count = pos;
 
-	shell->envp = realloc(shell->envp, sizeof(char *) * (count + 2));
+	char **tmp = realloc(shell->envp, sizeof(char *) * (count + 2));
 
-	if (!shell->envp) {
+	if (!tmp) {
 		free(new_var);
 		perror("shell_envp malloc");
-		return (-1);
+		return -1;
 	}
+
+	shell->envp = tmp;
 
 	shell->envp[count] = new_var;
 	shell->envp[count+1] = NULL;
@@ -144,29 +145,47 @@ char *get_shell_var(Shell *shell, char *name) {
 	return NULL;
 }
 
+static char *strip_quotes(char *input, size_t len) {
+	if(input[0] == '"' || input[0] == '\'') {
+		if(len < 2) { return strdup(input); }
+
+		char *out = malloc(len - 1);
+		memcpy(out, input+1, len-2);
+		out[len-2] = '\0';
+
+		free(input);
+
+		return out;
+	}
+	return input;
+}
+
 int add_shell_var(Shell *shell, ShellVar shell_var) {
 	int pos = 0;
 	while(shell->vars.s_vars[pos].name != NULL) {
 		if(strcmp(shell->vars.s_vars[pos].name, shell_var.name) == 0) {
-			update_shell_var(shell, shell_var);
+			return update_shell_var(shell, shell_var);
 		}
 		pos++;
 	}
 
 	if(shell->vars.count >= shell->vars.capacity) {
 		shell->vars.capacity += 20;
-		shell->vars.s_vars = realloc(shell->vars.s_vars, 
+		ShellVar *tmp = realloc(shell->vars.s_vars, 
 								sizeof(ShellVar) * shell->vars.capacity);
 
-		if(!shell->vars.s_vars) {
+		if(!tmp) {
 			perror("shell_vars.s_vars");
-			return 1;
+			return -1;
 		}
+
+		shell->vars.s_vars = tmp;
 	}
 
-	shell->vars.s_vars[shell->vars.count].name = strdup(shell_var.name);
-	shell->vars.s_vars[shell->vars.count].value = strdup(shell_var.value);
-	shell->vars.s_vars[shell->vars.count].exported = shell_var.exported;
+	char *value = strip_quotes(shell_var.value, strlen(shell_var.value));
+
+	shell->vars.s_vars[shell->vars.count].name = shell_var.name;
+	shell->vars.s_vars[shell->vars.count].value = value;
 
 	shell->vars.count++;
 	shell->vars.s_vars[shell->vars.count].name = NULL;
@@ -186,3 +205,11 @@ int update_shell_var(Shell *shell, ShellVar shell_var) {
 	return 0;
 }
 
+void add_last_status(Shell *shell) {
+	char buffer[16];
+	snprintf(buffer, sizeof(buffer), "%d", shell->last_status);
+
+	ShellVar var = { .name = strdup("?"), .value = strdup(buffer) };
+
+	add_shell_var(shell, var);
+}
