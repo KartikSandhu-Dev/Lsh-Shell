@@ -7,6 +7,7 @@ SRC = src/main.c \
       src/shell/shell.c \
       src/shell/variable.c \
       src/shell/history.c \
+      src/shell/signal.c \
       src/exec/execute.c \
       src/exec/builtin.c 
 

@@ -12,5 +12,6 @@
 
 #define HISTORY_CAPACITY 1024 // historty starting capacity
 #define SHELL_VAR_CAPACITY 1024 // shell var starting capacity
+#define JOBS_CAPACITY 128 // jobs starting capacity
 
 #endif

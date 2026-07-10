@@ -25,7 +25,7 @@ char *get_env_value(Shell *shell, const char *name);
 int set_env_value(Shell *shell, const char *name, const char *value);
 int unset_env_value(Shell *shell, const char *name);
 
-char *get_shell_var(Shell *shell, char *name);
+char *get_shell_var(Shell *shell, const char *name);
 int add_shell_var(Shell *shell, ShellVar shell_var);
 int update_shell_var(Shell *shell, ShellVar shell_var);
 

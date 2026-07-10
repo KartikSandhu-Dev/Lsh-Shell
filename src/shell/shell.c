@@ -1,4 +1,5 @@
 #include "shell/shell.h"
+#include "shell/signal.h"
 #include "shell/variable.h"
 #include "shell/history.h"
 
@@ -18,6 +19,7 @@ void shell_init(char **envp) {
 	shell.envp = duplicate_env(envp);
 	history_init(&shell);
 	shell_var_init(&shell);
+	sig_shell_init(&shell);
 
 	// set env variables for the shell
 	char shlvl[16];
@@ -50,6 +52,9 @@ void shell_init(char **envp) {
 		// add last status of the process to the "?" named shell variable
 		add_last_status(&shell);
 
+		// check the status of jobs
+		check_jobs(&shell);
+
 		// cleanup
 		clean_ASTs(ast);
 		clean_tokens(&token_list);
@@ -64,9 +69,9 @@ void print_prompt() {
 	// "eternal" in red, "@" in white, path in blue, "$" in white
 	printf("\033[31m%s\033[37m@", SHELL_NAME);
 	if (strncmp(cwd, home, strlen(home)) == 0) {
-		printf("\033[34m~%s\033[37m$\033[0m ", cwd + strlen(home));
+		printf("\033[34m~%s\033[37m#\033[0m ", cwd + strlen(home));
 	} else {
-		printf("\033[34m~%s\033[37m$\033[0m ", cwd);
+		printf("\033[34m~%s\033[37m#\033[0m ", cwd);
 	}
 
 	fflush(stdout);

@@ -2,7 +2,7 @@
 #define PARSER_H
 
 #include "lexer.h"
-#include <stdlib.h>
+#include "var/common.h"
 
 typedef struct ASTNode ASTNode;
 
@@ -38,6 +38,8 @@ typedef struct ASTNode {
 
 			Redir *redirs;
 			size_t redir_count;
+
+			bool background;
 		} Command;
 
 		struct {

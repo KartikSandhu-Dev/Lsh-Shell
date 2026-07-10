@@ -2,6 +2,7 @@
 #include "exec/builtin.h"
 #include "parse/parser.h"
 
+#include "shell/signal.h"
 #include "var/common.h"
 #include "shell/variable.h"
 #include "shell/variable.h"
@@ -195,8 +196,13 @@ int execute_command(ASTNode *node, Shell *shell) {
 		exit(EXIT_FAILURE);
 	}
 
-	int status;
-	waitpid(pid, &status, 0); // wait for the child
+	int status = 0;
+
+	if(node->Command.background) {
+		add_job(shell, pid);
+	} else {
+		waitpid(pid, &status, 0); // wait for the child
+	}
 
 	return WEXITSTATUS(status);
 }

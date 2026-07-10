@@ -2,11 +2,9 @@
 #include "shell/history.h"
 #include "shell/variable.h"
 #include "var/common.h"
+#include "shell/shell.h"
 
 #include <linux/limits.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 
 static BuiltIn builtins[] = {
@@ -17,6 +15,7 @@ static BuiltIn builtins[] = {
 	{"export", export_builtin},
 	{"unset", unset_builtin},
 	{"history", history_builtin},
+	{"jobs", jobs_builtin},
     {NULL, NULL}
 };
 
@@ -149,8 +148,15 @@ int export_builtin(ASTNode *node, Shell *shell) {
 }
 
 int unset_builtin(ASTNode *node, Shell *shell) {
+	if(node->Command.argc == 1) { return 1; }
 
-	return 1;
+	int pos = 1;
+	while(node->Command.argv[pos] != NULL) {
+		if(unset_env_value(shell, node->Command.argv[pos]) == 1) { return 1; }
+		pos++;
+	}
+
+	return 0;
 }
 
 int history_builtin(ASTNode *node, Shell *shell) {
@@ -161,6 +167,25 @@ int history_builtin(ASTNode *node, Shell *shell) {
 		write(STDOUT_FILENO, "\n", 1);
 	} else {
 		history_print(shell);
+	}
+	return 0;
+}
+
+int jobs_builtin(ASTNode *node, Shell *shell) {
+	for(size_t i = 0; i < shell->joblist.count; i++) {
+		Job *job = &shell->joblist.jobs[i];
+
+		switch (job->status) {
+			case JOB_RUNNING:
+				printf("|%d| running %s\n", job->id, job->command);
+				break;
+			case JOB_STOPPED:
+				printf("|%d| stopped %s\n", job->id, job->command);
+				break;
+			case JOB_DONE:
+				printf("|%d| done %s\n", job->id, job->command);
+				break;
+		}
 	}
 	return 0;
 }

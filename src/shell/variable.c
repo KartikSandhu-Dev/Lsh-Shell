@@ -8,7 +8,7 @@
 void shell_var_init(Shell *shell) {
 	shell->vars.capacity = SHELL_VAR_CAPACITY;
 	shell->vars.count = 0;
-	shell->vars.s_vars = calloc(sizeof(ShellVar) * shell->vars.capacity, sizeof(shell->vars.capacity));
+	shell->vars.s_vars = calloc(shell->vars.capacity, sizeof(ShellVar) * shell->vars.capacity);
 }
 
 int expand_variables(Shell *shell, ASTNode *node) {
@@ -131,10 +131,24 @@ int set_env_value(Shell *shell, const char *name, const char *value) {
 }
 
 int unset_env_value(Shell *shell, const char *name) {
-	return 0;
+	char *value = get_shell_var(shell, name);
+	if(value) {
+		set_env_value(shell, strdup(name), " ");
+		return 0;
+	}
+
+	value = get_env_value(shell, name);
+	if(value) {
+		set_env_value(shell, strdup(name), " ");
+		return 0;
+	}
+	
+	fprintf(stderr, "%s: Variable does not exist\n", name);
+	
+	return 1;
 }
 
-char *get_shell_var(Shell *shell, char *name) {
+char *get_shell_var(Shell *shell, const char *name) {
 	int pos = 0;
 	while(shell->vars.s_vars[pos].name != NULL) {
 		if(strcmp(shell->vars.s_vars[pos].name, name) == 0) {

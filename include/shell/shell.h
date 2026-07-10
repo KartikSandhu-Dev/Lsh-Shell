@@ -1,6 +1,7 @@
 #ifndef SHELL_H
 #define SHELL_H
 
+#include "shell/signal.h"
 #include "var/config.h"
 #include "shell/history.h"
 #include "shell/variable.h"
@@ -10,6 +11,7 @@ typedef struct Shell {
 	char **envp;
 	History history;
 	ShellVarList vars;
+	JobList joblist;
 	int last_status;
 } Shell;
 

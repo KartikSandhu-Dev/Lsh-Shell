@@ -19,5 +19,8 @@ int echo_builtin(ASTNode *node, Shell *shell);
 int export_builtin(ASTNode *node, Shell *shell);
 int unset_builtin(ASTNode *node, Shell *shell);
 int history_builtin(ASTNode *node, Shell *shell);
+int jobs_builtin(ASTNode *node, Shell *shell);
+int bg_builtin(ASTNode *node, Shell *shell);
+int fg_builtin(ASTNode *node, Shell *shell);
 
 #endif

@@ -50,6 +50,8 @@ ASTNode *parse_command(Parser *p) {
 	node->Command.redirs = malloc(sizeof(Redir)*MAX_REDIRECTIONS);
 	node->Command.redir_count = 0;
 
+	node->Command.background = false;
+
 	while(current(p).token_type == TOKEN_WORD) {
 		if(node->Command.argc >= MAX_ARGS - 1) {
 			fprintf(stderr, "Too many arguments\n");
@@ -101,6 +103,11 @@ ASTNode *parse_command(Parser *p) {
 
         node->Command.redirs[node->Command.redir_count] = r;
         node->Command.redir_count++;
+    }
+
+    if(current(p).token_type == TOKEN_BACKGROUND) {
+    	node->Command.background = true;
+    	advance(p);
     }
 
 	return node;
