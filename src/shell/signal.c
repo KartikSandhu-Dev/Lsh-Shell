@@ -53,6 +53,10 @@ void check_jobs(Shell *shell) {
 				&status, 
 				WNOHANG);
 
+		if(result == -1) {
+    		perror("waitpid");
+		}
+
 		if(result == 0) { continue; }
 
 		if(result == job->pid) {

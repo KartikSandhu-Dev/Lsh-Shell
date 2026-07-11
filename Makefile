@@ -13,7 +13,7 @@ SRC = src/main.c \
 
 OBJ = $(SRC:.c=.o)
 
-TARGET = eternal
+TARGET = lsh
 
 all: $(TARGET)
 
@@ -24,7 +24,7 @@ $(TARGET): $(OBJ)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 run: $(TARGET)
-	@sudo cp eternal /usr/local/bin/
+	@sudo cp $(TARGET) /usr/local/bin/
 
 clean:
 	@echo "CLEANED"
