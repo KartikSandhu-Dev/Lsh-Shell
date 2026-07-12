@@ -8,8 +8,8 @@
 #include "parse/parser.h"
 #include "exec/execute.h"
 
+#include <errno.h>
 #include <linux/limits.h>
-#include <stdio.h>
 #include <unistd.h>
 
 void shell_init(char **envp) {
@@ -32,10 +32,13 @@ void shell_init(char **envp) {
 	set_env_value(&shell, "SHLVL", shlvl);
 	set_env_value(&shell, "OLDPWD", "/");
 
+	add_shell_var(&shell, (ShellVar) {.name = "MADEBY", 
+									 .value = "Light-shell(lsh) made by Kartik Sandhu!"});
+
 	// ------MAIN SHELL LOOP--------
 	while(1) {
-		// check the status of jobs (if any)
-		check_jobs(&shell);
+		// update the job table according to their state (if any)
+		update_jobs(&shell);
 
 		// print prompt
 		print_prompt();
@@ -81,9 +84,14 @@ void print_prompt() {
 }
 
 int read_line(char *buffer, const int buffer_len) {
-	int len = read(STDIN_FILENO, buffer, buffer_len);
+	int len;
 
-	if(len <= 0) { return -1; }
+	while((len = read(STDIN_FILENO, buffer, buffer_len)) < 0) {
+		if(errno == EINTR) { continue; } 
+
+		return -1;
+	}
+
 
 	if(buffer[len - 1] == '\n') { len--; }
 

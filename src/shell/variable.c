@@ -1,9 +1,8 @@
 #include "shell/variable.h"
+#include "shell/shell.h"
+
 #include "var/config.h"
 #include "var/common.h"
-#include "shell/shell.h"
-#include <stdio.h>
-#include <string.h>
 
 void shell_var_init(Shell *shell) {
 	shell->vars.capacity = SHELL_VAR_CAPACITY;

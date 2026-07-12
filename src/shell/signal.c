@@ -4,15 +4,18 @@
 #include "var/common.h"
 
 #include <signal.h>
-#include <stdlib.h>
-#include <sys/types.h>
 #include <sys/wait.h>
+#include <unistd.h>
+
+volatile sig_atomic_t sigchild_received;
 
 void sig_shell_init(Shell *shell) {
 	shell->joblist.capacity = JOBS_CAPACITY;
 	shell->joblist.count = 0;
 
 	shell->joblist.jobs = calloc(shell->joblist.capacity, sizeof(Job));
+
+	sigchild_received = 0;
 
 	if(shell->joblist.jobs == NULL) {
 		perror("calloc");
@@ -26,6 +29,8 @@ void sig_shell_init(Shell *shell) {
 	signal(SIGTTIN, SIG_IGN);
 	signal(SIGTTOU, SIG_IGN);
 
+	signal(SIGCHLD, sigchild_handler);
+
 }
 
 void sig_child_init(Shell *shell) {
@@ -38,9 +43,10 @@ void sig_child_init(Shell *shell) {
 	signal(SIGCONT, SIG_DFL);
 	signal(SIGTTIN, SIG_DFL);
 	signal(SIGTTOU, SIG_DFL);
+
 }
 
-void add_job(Shell *shell, int pid) {
+void add_job(Shell *shell, pid_t pgid, pid_t *pids, int process_count) {
 	if(shell->joblist.count >= shell->joblist.capacity) {
 		shell->joblist.capacity+=10;
 		Job *tmp = realloc(shell->joblist.jobs, sizeof(Job) * shell->joblist.capacity);
@@ -53,41 +59,50 @@ void add_job(Shell *shell, int pid) {
 		shell->joblist.jobs = tmp;
 	}
 
-	Job job;
-	job.id = shell->joblist.count + 1;
-	job.pgid = pid;
-	job.command = strdup(shell->shell_buffer);
-	job.status = JOB_RUNNING;
+	Job *job = &shell->joblist.jobs[shell->joblist.count];
 
-	shell->joblist.jobs[shell->joblist.count] = job;
+	job->id = shell->joblist.count + 1;
+	job->pgid = pgid;
+
+	job->process_count = process_count;
+	job->finished_count = 0;
+
+	job->pids = malloc(sizeof(pid_t) * job->process_count);
+
+	memcpy(job->pids, pids, process_count * sizeof(pid_t));
+	
+	job->command = strdup(shell->shell_buffer);
+	job->status = JOB_RUNNING;
+
 	shell->joblist.count++;
 
-	printf("|%d| %d\n", job.id, job.pgid);
+	printf("|%d| %d\n", job->id, job->pgid);
 }
 
-void check_jobs(Shell *shell) {
+void update_jobs(Shell *shell) {
+	if(!sigchild_received) { return; }
+	sigchild_received = 0;
+
 	int status;
+	pid_t pid;
 
-	for(size_t i = 0; i < shell->joblist.count;) {
-		Job *job = &shell->joblist.jobs[i];
+	while((pid = waitpid(-1, &status, WNOHANG | WUNTRACED | WCONTINUED)) > 0) {
+		int jobidx = find_job_bypid(shell, pid);
+		if(jobidx == -1) { continue; }
 
-		pid_t result = waitpid(-job->pgid, 
-				&status, 
-				WNOHANG | WUNTRACED | WCONTINUED);
-
-		if(result == -1) {
-    		perror("waitpid");
-		}
-
-		if(result == 0) {  i++; continue; }
+		Job *job = &shell->joblist.jobs[jobidx];
 
 		if(WIFEXITED(status) || WIFSIGNALED(status)) {
-			job->status = JOB_DONE;
+			job->finished_count++;
 
-			printf("|%d| Done (%s)\n", job->id, job->command);
+			if(job->process_count == job->finished_count) {
+				job->status = JOB_DONE;
 
-			clean_job(shell, i);
-			continue;
+				printf("|%d| Done (%s)\n", job->id, job->command);
+
+				clean_job(shell, jobidx);
+				continue;
+			}
 		}
 
 		if(WIFSTOPPED(status)) {
@@ -97,14 +112,12 @@ void check_jobs(Shell *shell) {
 
 		if(WIFCONTINUED(status)) {
 			job->status = JOB_RUNNING;
+			printf("|%d| Continued (%s)\n", job->id, job->command);
 		}
-
-		i++;
 	}
-
 }
 
-int find_job_index(Shell *shell, int id) {
+int find_job_byid(Shell *shell, int id) {
 	for(size_t i = 0; i < shell->joblist.count; i++) {
 		if(shell->joblist.jobs[i].id == id) {
 			return i;
@@ -113,12 +126,30 @@ int find_job_index(Shell *shell, int id) {
 	return -1;
 }
 
+int find_job_bypid(Shell *shell, pid_t pid) {
+	for(size_t i = 0; i < shell->joblist.count; i++) {
+		Job *job = &shell->joblist.jobs[i];
+		for(int j = 0; j < job->process_count; j++) {
+			if(job->pids[j] == pid) {
+				return i;
+			}
+		}
+	}
+	return -1;
+}
+
 void clean_job(Shell *shell, size_t index) {
 	free(shell->joblist.jobs[index].command);
+	free(shell->joblist.jobs[index].pids);
 
 	for(size_t i = index; i + 1 < shell->joblist.count; i++) {
 		shell->joblist.jobs[i] = shell->joblist.jobs[i+1];
 	}
 
 	shell->joblist.count--;
+}
+
+void sigchild_handler(int sig) {
+	(void)sig;
+	sigchild_received = 1;
 }

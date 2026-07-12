@@ -31,7 +31,7 @@ static void free_command(ASTNode *node) {
 
 	pos = 0;
 	while(pos < node->Command.redir_count) {
-		free(node->Command.redirs->file);
+		free(node->Command.redirs[pos].file);
 		pos++;
 	}
 

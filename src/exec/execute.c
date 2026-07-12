@@ -1,17 +1,14 @@
 #include "exec/execute.h"
 #include "exec/builtin.h"
-#include "parse/parser.h"
 
 #include "shell/signal.h"
-#include "var/common.h"
-#include "shell/variable.h"
 #include "shell/variable.h"
 #include "shell/shell.h"
 
+#include "var/common.h"
+#include "parse/parser.h"
+
 #include <linux/limits.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/types.h>
 #include <sys/wait.h>
 
 #include <unistd.h>
@@ -109,11 +106,23 @@ static int *apply_redir(ASTNode *node, Shell *shell) {
 					oflags = O_WRONLY | O_APPEND | O_CREAT;
 					fd_change = STDOUT_FILENO;
 					break;
+				default:
+					close(prev_fd[1]);
+					close(prev_fd[0]);
+					free(prev_fd);
+					fprintf(stderr, "Unknown redirection type\n");
+					return NULL;
 			}
 
 			// open the file in the filepath
 			int fd = open(node->Command.redirs[i].file, oflags, 0644);
-			if(fd == -1) { perror("open"); return NULL; }
+			if(fd == -1) { 
+				perror("open");
+				close(prev_fd[1]);
+				close(prev_fd[0]);
+				free(prev_fd);
+				return NULL; 
+			}
 
 			dup2(fd, fd_change);
 			close(fd);
@@ -173,7 +182,8 @@ static void exec_external(ASTNode *node, Shell *shell) {
 	if(!path) { exit(EXIT_FAILURE); } 
 
 	// check for redirs, if present execute them
-	if(!apply_redir(node, shell)) { exit(EXIT_FAILURE); };
+	int *fd = apply_redir(node, shell);
+	if (fd == NULL) { exit(EXIT_FAILURE); }
 
 	// if no redir execute normally
 	execve(path, node->Command.argv, shell->envp);
@@ -188,8 +198,9 @@ int execute_command(ASTNode *node, Shell *shell) {
 	if(builtin.name != NULL) {
 		// if redir apply redir (makes stdout fd something else)
 		int *fd = apply_redir(node, shell);
-		int status = builtin.func(node, shell);
+		if (fd == NULL) { return 1; }
 
+		int status = builtin.func(node, shell);
 		reset_redir(fd); // reset stdout fd after executing func
 		return status;
 	}
@@ -212,9 +223,11 @@ int execute_command(ASTNode *node, Shell *shell) {
 	setpgid(pid, pid);
 
 	int status = 0;
+	pid_t pids[1] = {pid};
 
 	if(node->Command.background) {
-		add_job(shell, pid); // add it to the background jobs
+		add_job(shell, pid, pids, 1); // add it to the background jobs
+		return 0;
 	} else {
 		tcsetpgrp(STDIN_FILENO, pid); // give the terminal to the child
 
@@ -225,16 +238,12 @@ int execute_command(ASTNode *node, Shell *shell) {
 	}
 
 	if(WIFSTOPPED(status)) {
-		add_job(shell, pid);
+		add_job(shell, pid, pids, 1);
 		shell->joblist.jobs[shell->joblist.count-1].status = JOB_STOPPED;
 		return 128 + WSTOPSIG(status);
-	}
-
-	if(WIFSIGNALED(status)) {
+	} else if(WIFSIGNALED(status)) {
 		return 128 + WTERMSIG(status);
-	}
-
-	if(WIFEXITED(status)) {
+	} else if(WIFEXITED(status)) {
 		return WEXITSTATUS(status);
 	}
 
@@ -247,8 +256,9 @@ static void exec_child(ASTNode *node, Shell *shell) {
 
 	if(builtin.name != NULL) {
 		int *fd = apply_redir(node, shell);
-		int status = builtin.func(node, shell);
+		if (fd == NULL) { return; }
 
+		int status = builtin.func(node, shell);
 		reset_redir(fd);
 		exit(status); // because its in a child process
 	} else {
@@ -337,16 +347,12 @@ int execute_pipeline(Pipeline *pl, Shell *shell) {
 	tcsetpgrp(STDIN_FILENO, getpgrp());
 
 	if(WIFSTOPPED(status)) {
-		add_job(shell, pgid);
+		add_job(shell, pgid, pids, pl->count);
 		shell->joblist.jobs[shell->joblist.count-1].status = JOB_STOPPED;
 		return 128 + WSTOPSIG(status);
-	}
-
-	if(WIFSIGNALED(status)) {
+	} else if(WIFSIGNALED(status)) {
 		return 128 + WTERMSIG(status);
-	}
-
-	if(WIFEXITED(status)) {
+	} else if(WIFEXITED(status)) {
 		return WEXITSTATUS(status);
 	}
 

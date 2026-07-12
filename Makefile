@@ -24,7 +24,8 @@ $(TARGET): $(OBJ)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 run: $(TARGET)
-	@sudo cp $(TARGET) /usr/local/bin/
+	@sudo mv $(TARGET) /usr/local/bin/
+	@sudo chmod +x /usr/local/bin/lsh
 
 clean:
 	@echo "CLEANED"

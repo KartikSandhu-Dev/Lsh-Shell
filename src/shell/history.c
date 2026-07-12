@@ -1,7 +1,8 @@
 #include "shell/history.h"
+#include "shell/shell.h"
+
 #include "var/config.h"
 #include "var/common.h"
-#include "shell/shell.h"
 
 void history_init(Shell *shell) {
 	shell->history.count = 0;

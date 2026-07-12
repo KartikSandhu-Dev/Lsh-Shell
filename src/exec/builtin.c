@@ -2,13 +2,11 @@
 #include "shell/history.h"
 #include "shell/signal.h"
 #include "shell/variable.h"
-#include "var/common.h"
 #include "shell/shell.h"
+#include "var/common.h"
 
 #include <linux/limits.h>
 #include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -195,7 +193,7 @@ int bg_builtin(ASTNode *node, Shell *shell) {
 	if(node->Command.argv[1] == NULL) { id_user = 1; } 
 	else { id_user = atoi(node->Command.argv[1]); }
 
-	int job_idx = find_job_index(shell, id_user);
+	int job_idx = find_job_byid(shell, id_user);
 
 	if(job_idx == -1) {
 		fprintf(stderr, "Job: id |%s| does not exist\n", node->Command.argv[1]);
@@ -232,7 +230,7 @@ int fg_builtin(ASTNode *node, Shell *shell) {
 	if(node->Command.argv[1] == NULL) { id_user = 1; } 
 	else { id_user = atoi(node->Command.argv[1]); }
 
-	int job_idx = find_job_index(shell, id_user);
+	int job_idx = find_job_byid(shell, id_user);
 
 	if(job_idx == -1) {
 		fprintf(stderr, "Job: id %s does not exist\n", node->Command.argv[1]);
