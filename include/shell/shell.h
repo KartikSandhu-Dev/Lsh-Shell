@@ -13,6 +13,7 @@ typedef struct Shell {
 	ShellVarList vars;
 	JobList joblist;
 	int last_status;
+	bool is_interactive;
 } Shell;
 
 void shell_init(char **envp);

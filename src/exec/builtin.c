@@ -7,6 +7,7 @@
 
 #include <linux/limits.h>
 #include <signal.h>
+#include <stdlib.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -202,6 +203,11 @@ int bg_builtin(ASTNode *node, Shell *shell) {
 
 	Job *job = &shell->joblist.jobs[job_idx];
 
+	if(kill(-job->pgid, SIGCONT) < 0) {
+		perror("bg: kill (SIGCONT) failed");
+		return -1;
+	}
+
 	switch (job->status) {
 		case JOB_RUNNING:
 			printf("Job: id |%d| is already running\n", job->id);
@@ -212,11 +218,6 @@ int bg_builtin(ASTNode *node, Shell *shell) {
 		case JOB_DONE:
 			printf("Job: id |%d| is already done\n", job->id);
 			return 0;
-	}
-
-	if(kill(-job->pgid, SIGCONT) < 0) {
-		perror("bg: kill (SIGCONT) failed");
-		return -1;
 	}
 
 	job->status = JOB_RUNNING;
@@ -249,19 +250,26 @@ int fg_builtin(ASTNode *node, Shell *shell) {
 		return -1;
 	}
 
-	pid_t ret = waitpid(-job->pgid, &status, WUNTRACED);
+	while(job->process_count > job->finished_count) {
+		pid_t ret = waitpid(-job->pgid, &status, WUNTRACED);
 
-	if(ret == -1) {
-		perror("waitpid");
-		tcsetpgrp(STDIN_FILENO, getpgrp());
-		return 1;
+		if(ret == -1) {
+			perror("waitpid");
+			tcsetpgrp(STDIN_FILENO, getpgrp());
+			return 1;
+		}
+
+		if(WIFSTOPPED(status)) {
+			job->status = JOB_STOPPED;
+			break;
+		} else if(WIFEXITED(status) || WIFSIGNALED(status)) {
+			job->finished_count++;
+		}
 	}
 
 	tcsetpgrp(STDIN_FILENO, getpgrp());
 
-	if (WIFSTOPPED(status)) {
-		job->status = JOB_STOPPED;
-	} else if (WIFEXITED(status) || WIFSIGNALED(status)) {
+	if(job->process_count == job->finished_count) {
 		clean_job(shell, job_idx);
 	}
 

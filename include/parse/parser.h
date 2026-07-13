@@ -15,6 +15,7 @@ typedef enum ASTtype {
 	NODE_COMMAND,
 	NODE_PIPE,
 	NODE_AND,
+	NODE_BACKGROUND,
 } ASTtype;
 
 typedef enum RedirType {
@@ -38,14 +39,16 @@ typedef struct ASTNode {
 
 			Redir *redirs;
 			size_t redir_count;
-
-			bool background;
 		} Command;
 
 		struct {
 			ASTNode *left;
 			ASTNode *right;
 		} Binary;
+
+		struct {
+			ASTNode* node;
+		} Background;
 	};
 
 } ASTNode;
@@ -55,6 +58,7 @@ ASTNode *parse_tokens(TokenList *token_list);
 ASTNode *parse_command(Parser *parser);
 ASTNode *parse_and(Parser *parser);
 ASTNode *parse_pipe(Parser *parser);
+ASTNode *parse_background(Parser *parser);
 
 void clean_ASTs(ASTNode *node);
 void print_ASTs(ASTNode *node, int indent);

@@ -17,12 +17,14 @@ void shell_init(char **envp) {
 
 	// shell becomes its own process group leader
 	setpgid(0, 0);
+	tcsetpgrp(STDIN_FILENO, getpgrp());
 
 	// give shell its values
 	shell.envp = duplicate_env(envp);
 	history_init(&shell);
 	shell_var_init(&shell);
 	sig_shell_init(&shell);
+	shell.is_interactive = true;
 
 	// set env variables for the shell
 	char shlvl[16];
@@ -92,7 +94,7 @@ int read_line(char *buffer, const int buffer_len) {
 		return -1;
 	}
 
-	if(buffer[len - 1] == '\n') { len--; }
+	if(len > 0 && buffer[len - 1] == '\n') { len--; }
 
 	buffer[len] = '\0';
 

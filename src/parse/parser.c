@@ -2,6 +2,8 @@
 #include "parse/parser.h"
 #include "var/config.h"
 #include "var/common.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 static Token current(Parser *p) {
 	return p->token_list.tokens[p->pos];
@@ -16,7 +18,7 @@ ASTNode *parse_tokens(TokenList *token_list) {
 	p.token_list = *token_list;
 	p.pos = 0;
 
-	return parse_and(&p);
+	return parse_background(&p);
 }
 
 static void free_command(ASTNode *node) {
@@ -41,7 +43,7 @@ static void free_command(ASTNode *node) {
 }
 
 ASTNode *parse_command(Parser *p) {
-	ASTNode *node = malloc(sizeof(ASTNode));
+	ASTNode *node = calloc(1, sizeof(ASTNode));
 
 	node->ast_type = NODE_COMMAND;
 	node->Command.argc = 0;
@@ -49,8 +51,6 @@ ASTNode *parse_command(Parser *p) {
 
 	node->Command.redirs = malloc(sizeof(Redir)*MAX_REDIRECTIONS);
 	node->Command.redir_count = 0;
-
-	node->Command.background = false;
 
 	while(current(p).token_type == TOKEN_WORD) {
 		if(node->Command.argc >= MAX_ARGS - 1) {
@@ -107,11 +107,6 @@ ASTNode *parse_command(Parser *p) {
         node->Command.redir_count++;
     }
 
-    if(current(p).token_type == TOKEN_BACKGROUND) {
-    	node->Command.background = true;
-    	advance(p);
-    }
-
 	return node;
 }
 
@@ -123,7 +118,7 @@ ASTNode *parse_and(Parser *p) {
 
 		ASTNode *right = parse_pipe(p);
 
-		ASTNode *node = malloc(sizeof(ASTNode));
+		ASTNode *node = calloc(1, sizeof(ASTNode));
 		node->ast_type = NODE_AND;
 
 		node->Binary.left = left;
@@ -143,7 +138,7 @@ ASTNode *parse_pipe(Parser *p) {
 
 		ASTNode *right = parse_command(p);
 
-		ASTNode *node = malloc(sizeof(ASTNode));
+		ASTNode *node = calloc(1, sizeof(ASTNode));
 		node->ast_type = NODE_PIPE;
 
 		node->Binary.left = left;
@@ -153,6 +148,21 @@ ASTNode *parse_pipe(Parser *p) {
 	}
 
 	return left;
+}
+
+ASTNode *parse_background(Parser *p) {
+	ASTNode *node = parse_and(p);
+
+	if(current(p).token_type == TOKEN_BACKGROUND) {
+		ASTNode *bg = calloc(1, sizeof(ASTNode));
+		bg->ast_type = NODE_BACKGROUND;
+
+		bg->Background.node = node;
+
+		node = bg;
+	}
+
+	return node;
 }
 
 void clean_ASTs(ASTNode *node) {
@@ -172,7 +182,11 @@ void clean_ASTs(ASTNode *node) {
 			clean_ASTs(node->Binary.right);
 			free(node);
 			break;
-	}
+		case NODE_BACKGROUND:
+			clean_ASTs(node->Background.node);
+			free(node);
+			break;
+		}
 }
 
 static void print_indent(int indent) {
@@ -211,5 +225,9 @@ void print_ASTs(ASTNode *node, int indent) {
 			print_ASTs(node->Binary.left, indent + 1);
 			print_ASTs(node->Binary.right, indent + 1);
 			break;
-	}
+		case NODE_BACKGROUND:
+			printf("Background\n");
+			print_ASTs(node->Background.node, indent +1);
+			break;
+		}
 }

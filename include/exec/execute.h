@@ -15,8 +15,9 @@ int execute(ASTNode *node, Shell *shell);
 char *resolve_path(Shell *shell, const char *command_name);
 
 int execute_command(ASTNode *node, Shell *shell);
-int execute_pipeline(Pipeline *pipeline, Shell *shell);
+int execute_pipeline(Pipeline *pipeline, Shell *shell, bool background);
 int execute_and(ASTNode *node, Shell *shell);
+int execute_background(ASTNode *node, Shell *shell);
 
 void collect_pipeline(ASTNode *node, Pipeline *pipeline);
 

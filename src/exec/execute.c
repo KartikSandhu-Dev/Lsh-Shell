@@ -9,6 +9,9 @@
 #include "parse/parser.h"
 
 #include <linux/limits.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
 #include <sys/wait.h>
 
 #include <unistd.h>
@@ -27,12 +30,14 @@ int execute(ASTNode *node, Shell *shell) {
 			{
 				Pipeline pipeline = {0};
 				collect_pipeline(node, &pipeline);
-				return execute_pipeline(&pipeline, shell);
+				return execute_pipeline(&pipeline, shell, false);
 			}
 		case NODE_AND:
 			return execute_and(node, shell);
+		case NODE_BACKGROUND:
+			return execute_background(node, shell);
 		default:
-			return 1;
+			return -1;
 	}
 }
 
@@ -224,39 +229,46 @@ int execute_command(ASTNode *node, Shell *shell) {
 
 	if(pid == 0) {
 		// making the child its own pgid leader
-		setpgid(0, 0);
+		// if it was background the execute_background command already sets the pgid leader
+		if(shell->is_interactive) { setpgid(0, 0); }
 
 		exec_external(node, shell); // execute commands in PATH 
 	}
 
-	setpgid(pid, pid);
+	if(shell->is_interactive) { setpgid(pid, pid); }
 
 	int status = 0;
 	pid_t pids[1] = {pid};
 
-	if(node->Command.background) {
-		add_job(shell, pid, pids, 1); // add it to the background jobs
-		return 0;
-	} else {
+	if(shell->is_interactive) {
 		tcsetpgrp(STDIN_FILENO, pid); // give the terminal to the child
 
 		waitpid(pid, &status, WUNTRACED); // wait for the child
 
 		// give the terminal back to the shell after child finishes
 		tcsetpgrp(STDIN_FILENO, getpgrp());
-	}
 
-	if(WIFSTOPPED(status)) {
-		add_job(shell, pid, pids, 1);
-		shell->joblist.jobs[shell->joblist.count-1].status = JOB_STOPPED;
-		return 128 + WSTOPSIG(status);
-	} else if(WIFSIGNALED(status)) {
-		return 128 + WTERMSIG(status);
-	} else if(WIFEXITED(status)) {
-		return WEXITSTATUS(status);
-	}
+		if(WIFSTOPPED(status)) {
+			add_job(shell, pid, pids, 1);
+			shell->joblist.jobs[shell->joblist.count-1].status = JOB_STOPPED;
+			return 128 + WSTOPSIG(status);
 
-	return 1;
+		} else if(WIFSIGNALED(status)) {
+			return 128 + WTERMSIG(status);
+
+		} else if(WIFEXITED(status)) {
+			return WEXITSTATUS(status);
+		}
+
+	} else {
+		int status;
+		waitpid(pid, &status, 0);
+
+		if(WIFEXITED(status)) { return WEXITSTATUS(status); }
+
+		return 1;
+	}
+	return 0;
 }
 
 // for executing commands in child process (for pipes, ands)
@@ -284,7 +296,7 @@ void collect_pipeline(ASTNode *node, Pipeline *pipeline) {
 	}
 }
 
-int execute_pipeline(Pipeline *pl, Shell *shell) {
+int execute_pipeline(Pipeline *pl, Shell *shell, bool background) {
 	int pipefds[pl->count - 1][2]; // pipe one less than commands curl | grep -> 1 pipe
 	// 0 -> read, 1 -> write
 
@@ -343,24 +355,36 @@ int execute_pipeline(Pipeline *pl, Shell *shell) {
 		close(pipefds[i][1]);
 	}
 
-	// give terminal ownership to process group
-	tcsetpgrp(STDIN_FILENO, pgid);
 	int status;
 
-	// wait for every child
-	for(int i = 0; i < pl->count; i++) {
-		waitpid(pids[i], &status, WUNTRACED);
+	if(!background) {
+		// give terminal ownership to process group
+		tcsetpgrp(STDIN_FILENO, pgid);
+
+		// wait for every child
+		for(int i = 0; i < pl->count; i++) {
+			waitpid(pids[i], &status, WUNTRACED);
+		}
+
+		// give terminal ownership to shell
+		tcsetpgrp(STDIN_FILENO, getpgrp());
 	}
 
-	// give terminal ownership to shell
-	tcsetpgrp(STDIN_FILENO, getpgrp());
+	if(background) {
+		add_job(shell, pgid, pids, pl->count);
+	}
 
 	if(WIFSTOPPED(status)) {
-		add_job(shell, pgid, pids, pl->count);
-		shell->joblist.jobs[shell->joblist.count-1].status = JOB_STOPPED;
+		if(!background) {
+			add_job(shell, pgid, pids, pl->count);
+			shell->joblist.jobs[shell->joblist.count-1].status = JOB_STOPPED;
+		}
+
 		return 128 + WSTOPSIG(status);
+
 	} else if(WIFSIGNALED(status)) {
 		return 128 + WTERMSIG(status);
+
 	} else if(WIFEXITED(status)) {
 		return WEXITSTATUS(status);
 	}
@@ -370,9 +394,63 @@ int execute_pipeline(Pipeline *pl, Shell *shell) {
 
 int execute_and(ASTNode *node, Shell *shell) {
 	int status = execute(node->Binary.left, shell);
-
 	if(status == 0) {
 		return execute(node->Binary.right, shell);
+	}
+
+	return -1;
+}
+
+int execute_background(ASTNode *node, Shell *shell) {
+	if(node->Background.node->ast_type == NODE_COMMAND) {
+		pid_t pid = fork();
+
+		if(pid < 0) {
+			perror("fork");
+			return 1;
+		}
+
+		if(pid == 0) {
+			setpgid(0, 0);
+			sig_child_init(shell); // init signals to default on child
+			exec_child(node->Background.node, shell);
+		}
+
+		setpgid(pid, pid);
+		pid_t pids[] = {pid};
+
+		add_job(shell, pid, pids, 1);
+		shell->joblist.jobs[shell->joblist.count-1].status = JOB_RUNNING;
+
+		return 0;
+	} else if(node->Background.node->ast_type == NODE_PIPE) {
+		Pipeline pl = {0};
+		collect_pipeline(node->Background.node, &pl);
+		return execute_pipeline(&pl, shell, true);
+	} else {
+		pid_t pid = fork();
+
+		if(pid < 0) {
+			perror("fork");
+			return 1;
+		}
+
+		if(pid == 0) {
+			setpgid(0, 0);
+			sig_child_init(shell); // init signals to default on child
+			shell->is_interactive = false;
+
+			int status = execute(node->Background.node, shell);
+			exit(status);
+		}
+
+		setpgid(pid, pid);
+		pid_t pids[] = {pid};
+
+		add_job(shell, pid, pids, 1);
+		shell->joblist.jobs[shell->joblist.count-1].status = JOB_RUNNING;
+		
+		return 0;
 	}
 
 	return -1;
