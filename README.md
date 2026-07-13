@@ -287,7 +287,7 @@ are forwarded to entire process groups, allowing every process in a pipeline to 
 Clone the repository
 
 ```bash
-git clone https://github.com/KartikSandhu-Dev/LshShell.git
+git clone https://github.com/KartikSandhu-Dev/Lsh-Shell.git
 cd LshShell
 ```
 
