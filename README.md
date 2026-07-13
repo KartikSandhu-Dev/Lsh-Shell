@@ -23,8 +23,9 @@ LshShell is a personal systems programming project built to understand how real 
 * Abstract Syntax Tree (AST)
 * Operator precedence
 * Recursive execution engine
+* Logical AND (`&&`)
 
-### Pipes & Redirection
+### Pipes, Redirection & Operators
 
 * Arbitrarily long pipelines
 
@@ -102,6 +103,12 @@ Redirection
 Hello
 ```
 
+Logical AND
+
+```sh
+make && ./program
+```
+
 Background jobs
 
 ```sh
@@ -128,9 +135,33 @@ Kartik
 
 [lsh]@~# export name
 [lsh]@~# unset name
+```
+
+Environment vairbales
+
+```sh
+[lsh]@~# echo $SHELL
+/usr/local/bin/lsh
 
 [lsh]@~# export HOME=/home/person
 ```
+
+History
+
+```sh
+[lsh]@~# history
+```
+
+---
+
+### Complex Example
+
+Commands can freely combine logical operators, pipelines, redirections, and background execution.
+
+```sh
+[lsh]@~# cat input.txt | grep main | sort > output.txt && echo Done
+
+````
 
 ---
 
@@ -298,14 +329,13 @@ Enjoy!
 
 ---
 
-# Random
+# Fun Detail
 
 * Added a shell variable called "MADEBY"
 ```sh
-[lsh]@~# echo $MADEBYE
+[lsh]@~# echo $MADEBY
 Light-shell(lsh) made by Kartik Sandhu!
 ```
-
 ---
 
 ## License

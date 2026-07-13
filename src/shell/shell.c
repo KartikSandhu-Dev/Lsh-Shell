@@ -92,7 +92,6 @@ int read_line(char *buffer, const int buffer_len) {
 		return -1;
 	}
 
-
 	if(buffer[len - 1] == '\n') { len--; }
 
 	buffer[len] = '\0';
