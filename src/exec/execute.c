@@ -372,6 +372,7 @@ int execute_pipeline(Pipeline *pl, Shell *shell, bool background) {
 
 	if(background) {
 		add_job(shell, pgid, pids, pl->count);
+		return 0;
 	}
 
 	if(WIFSTOPPED(status)) {

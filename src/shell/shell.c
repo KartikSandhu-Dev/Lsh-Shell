@@ -24,6 +24,7 @@ void shell_init(char **envp) {
 	history_init(&shell);
 	shell_var_init(&shell);
 	sig_shell_init(&shell);
+	setsid();
 	shell.is_interactive = true;
 
 	// set env variables for the shell
