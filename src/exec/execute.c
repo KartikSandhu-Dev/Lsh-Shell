@@ -368,9 +368,7 @@ int execute_pipeline(Pipeline *pl, Shell *shell, bool background) {
 
 		// give terminal ownership to shell
 		tcsetpgrp(STDIN_FILENO, getpgrp());
-	}
-
-	if(background) {
+	} else {
 		add_job(shell, pgid, pids, pl->count);
 		return 0;
 	}
