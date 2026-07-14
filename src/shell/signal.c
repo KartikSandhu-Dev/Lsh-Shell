@@ -1,5 +1,6 @@
 #include "shell/signal.h"
 #include "shell/shell.h"
+#include "var/colors.h"
 #include "var/config.h"
 #include "var/common.h"
 
@@ -76,7 +77,7 @@ void add_job(Shell *shell, pid_t pgid, pid_t *pids, int process_count) {
 
 	shell->joblist.count++;
 
-	printf("|%d| %d\n", job->id, job->pgid);
+	printf(BR_GREEN "|%d|" RESET " Added job %d\n", job->id, job->pgid);
 }
 
 void update_jobs(Shell *shell) {
@@ -98,7 +99,7 @@ void update_jobs(Shell *shell) {
 			if(job->process_count == job->finished_count) {
 				job->status = JOB_DONE;
 
-				printf("|%d| Done (%s)\n", job->id, job->command);
+				printf(BR_GREEN "|%d|" RESET " Done (%s)\n", job->id, job->command);
 
 				clean_job(shell, jobidx);
 				continue;
@@ -107,12 +108,12 @@ void update_jobs(Shell *shell) {
 
 		if(WIFSTOPPED(status)) {
 			job->status = JOB_STOPPED;
-			printf("|%d| Stopped (%s)\n", job->id, job->command);
+			printf(BR_YELLOW "|%d|" RESET " Stopped (%s)\n", job->id, job->command);
 		}
 
 		if(WIFCONTINUED(status)) {
 			job->status = JOB_RUNNING;
-			printf("|%d| Continued (%s)\n", job->id, job->command);
+			printf(BR_GREEN "|%d|" RESET " Continued (%s)\n", job->id, job->command);
 		}
 	}
 }

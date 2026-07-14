@@ -1,9 +1,12 @@
 #include "exec/builtin.h"
 #include "shell/history.h"
+
 #include "shell/signal.h"
 #include "shell/variable.h"
 #include "shell/shell.h"
+
 #include "var/common.h"
+#include "var/colors.h"
 
 #include <linux/limits.h>
 #include <signal.h>
@@ -175,13 +178,18 @@ int jobs_builtin(ASTNode *node, Shell *shell) {
 
 		switch (job->status) {
 			case JOB_RUNNING:
-				printf("|%d| Running (%s)\n", job->id, job->command);
+				printf(BR_GREEN "|%d|" RESET " Running (%s)\n",
+				job->id, job->command);
 				break;
+
 			case JOB_STOPPED:
-				printf("|%d| Stopped (%s)\n", job->id, job->command);
+				printf(BR_YELLOW "|%d|" RESET " Stopped (%s)\n",
+				job->id, job->command);
 				break;
+
 			case JOB_DONE:
-				printf("|%d| Done (%s)\n", job->id, job->command);
+				printf(BR_GREEN "|%d|" RESET " Done  (%s)\n",
+				job->id, job->command);
 				break;
 		}
 	}
@@ -197,7 +205,7 @@ int bg_builtin(ASTNode *node, Shell *shell) {
 	int job_idx = find_job_byid(shell, id_user);
 
 	if(job_idx == -1) {
-		fprintf(stderr, "Job: id |%s| does not exist\n", node->Command.argv[1]);
+		fprintf(stderr, BR_RED "Job:" RESET " id |%s| does not exist\n", node->Command.argv[1]);
 		return 1;
 	}
 
@@ -210,13 +218,15 @@ int bg_builtin(ASTNode *node, Shell *shell) {
 
 	switch (job->status) {
 		case JOB_RUNNING:
-			printf("Job: id |%d| is already running\n", job->id);
+			printf(BR_GREEN "Job:" RESET " id |%d| is already running\n", job->id);
 			return 0;
+
 		case JOB_STOPPED:
-			printf("Job: id |%d| has been started again\n", job->id);
+			printf(BR_GREEN "Job:" RESET " id |%d| has been started again\n", job->id);
 			break;
+
 		case JOB_DONE:
-			printf("Job: id |%d| is already done\n", job->id);
+			printf(BR_GREEN "Job:" RESET " id |%d| is already done\n", job->id);
 			return 0;
 	}
 
@@ -234,7 +244,7 @@ int fg_builtin(ASTNode *node, Shell *shell) {
 	int job_idx = find_job_byid(shell, id_user);
 
 	if(job_idx == -1) {
-		fprintf(stderr, "Job: id %s does not exist\n", node->Command.argv[1]);
+		fprintf(stderr, BR_RED "Job:" RESET " id %s does not exist\n", node->Command.argv[1]);
 		return 1;
 	}
 

@@ -1,4 +1,5 @@
 #include "parse/lexer.h"
+#include "var/colors.h"
 #include "var/common.h"
 #include "var/config.h"
 #include <unistd.h>
@@ -95,7 +96,7 @@ Token next_token(Lexer *lex) {
 			break;
 
 		default:
-			fprintf(stderr, "Used unexpected token %c", current(lex));
+			fprintf(stderr, BR_RED "Used unexpected token" RESET " %c\n", current(lex));
 			break;
 	}
 	advance(lex);

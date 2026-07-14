@@ -6,6 +6,7 @@
 #include "shell/shell.h"
 
 #include "var/common.h"
+#include "var/colors.h"
 #include "parse/parser.h"
 
 #include <linux/limits.h>
@@ -50,7 +51,7 @@ char *resolve_path(Shell *shell, const char *command_name) {
 		if(access(command_name, X_OK) == 0) {
 			return strdup(command_name);
 		} else {
-			fprintf(stderr, "Error: could not execute '%s': %s\n", command_name, strerror(errno));
+			fprintf(stderr, BR_RED "Error:" RESET " could not execute '%s': %s\n", command_name, strerror(errno));
 			return NULL;
 		}
 	}
@@ -78,7 +79,7 @@ char *resolve_path(Shell *shell, const char *command_name) {
 	}
 
 	free(path);	
-	fprintf(stderr, "%s: command not found\n", command_name);
+	fprintf(stderr, BR_RED "%s:" RESET " command not found\n", command_name);
 
 	return NULL;
 }
@@ -115,7 +116,7 @@ static int *apply_redir(ASTNode *node, Shell *shell) {
 					close(prev_fd[1]);
 					close(prev_fd[0]);
 					free(prev_fd);
-					fprintf(stderr, "Unknown redirection type\n");
+					fprintf(stderr, BR_RED "Unknown redirection type" RESET "\n");
 					return NULL;
 			}
 
@@ -160,7 +161,7 @@ static int add_assingment(ASTNode *node, Shell *shell) {
 	int pos = 0;
 	while(node->Command.argv[pos]) {
 		if(!is_assignment(node->Command.argv[pos])) {
-			fprintf(stderr, "Used something other than assingment in command\n");
+			fprintf(stderr, BR_RED "Used something other than assingment in command" RESET "\n");
 			return 1;
 		}
 

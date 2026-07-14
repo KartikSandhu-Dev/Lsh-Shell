@@ -4,12 +4,15 @@
 #include "shell/history.h"
 
 #include "var/config.h"
+#include "var/colors.h"
 #include "parse/lexer.h"
 #include "parse/parser.h"
 #include "exec/execute.h"
 
 #include <errno.h>
 #include <linux/limits.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 void shell_init(char **envp) {
@@ -36,7 +39,7 @@ void shell_init(char **envp) {
 	set_env_value(&shell, "OLDPWD", "/");
 
 	add_shell_var(&shell, (ShellVar) {.name = "MADEBY", 
-									 .value = "Light-shell(lsh) made by Kartik Sandhu!"});
+									 .value = "Light-shell(lsh) made by" BR_CYAN "Kartik Sandhu!" RESET " "});
 
 	// ------MAIN SHELL LOOP--------
 	while(1) {
@@ -75,16 +78,20 @@ void print_prompt() {
 	getcwd(cwd, sizeof(cwd));
 	const char *home = getenv("HOME");
 
-	// "eternal" in red, "@" in white, path in blue, "$" in white
-	printf("\033[31m%s\033[37m@", SHELL_NAME);
-	if (strncmp(cwd, home, strlen(home)) == 0) {
-		printf("\033[34m~%s\033[37m#\033[0m ", cwd + strlen(home));
+	printf(BG_BADGE);
+	printf(FG_WHITE " %s " RESET " ", SHELL_NAME);
+
+	if(home && strncmp(cwd, home, strlen(home)) == 0) {
+		printf(FG_PATH_BLUE "~%s" RESET " ", cwd + strlen(home));
 	} else {
-		printf("\033[34m~%s\033[37m#\033[0m ", cwd);
+		printf(FG_PATH_BLUE "%s" RESET " ", cwd);
 	}
+
+	printf(FG_PROMPT_GREEN "❯" RESET " ");
 
 	fflush(stdout);
 }
+
 
 int read_line(char *buffer, const int buffer_len) {
 	int len;

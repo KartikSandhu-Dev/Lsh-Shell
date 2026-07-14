@@ -1,6 +1,7 @@
 #include "shell/variable.h"
 #include "shell/shell.h"
 
+#include "var/colors.h"
 #include "var/config.h"
 #include "var/common.h"
 
@@ -32,7 +33,7 @@ int expand_variables(Shell *shell, ASTNode *node) {
 			    node->Command.argv[pos] = strdup(var);
 			} else {
 			    node->Command.argv[pos] = strdup("");
-			    fprintf(stderr, "%s: unkown variable\n", name);
+			    fprintf(stderr, BR_RED "%s:" RESET " unkown variable\n", name);
 			    free(name);
 			    return 1;
 			}
@@ -147,7 +148,7 @@ int unset_env_value(Shell *shell, const char *name) {
 		return 0;
 	}
 	
-	fprintf(stderr, "%s: Variable does not exist\n", name);
+	fprintf(stderr, BR_RED "%s:" RESET " Variable does not exist\n", name);
 	
 	return 1;
 }

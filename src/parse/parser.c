@@ -1,5 +1,6 @@
 #include "parse/lexer.h"
 #include "parse/parser.h"
+#include "var/colors.h"
 #include "var/config.h"
 #include "var/common.h"
 #include <stdio.h>
@@ -54,7 +55,7 @@ ASTNode *parse_command(Parser *p) {
 
 	while(current(p).token_type == TOKEN_WORD) {
 		if(node->Command.argc >= MAX_ARGS - 1) {
-			fprintf(stderr, "Too many arguments\n");
+			fprintf(stderr, BR_RED "Too many arguments" RESET "\n");
 			free_command(node);
 			return NULL;
 		}
@@ -72,7 +73,7 @@ ASTNode *parse_command(Parser *p) {
 		  current(p).token_type == TOKEN_APPEND) {
 
 		if(node->Command.redir_count >= MAX_REDIRECTIONS) {
-			fprintf(stderr, "Too many REDIRECTIONS\n");
+			fprintf(stderr, BR_RED "Too many REDIRECTIONS" RESET "\n");
 			free_command(node);
 			return NULL;
 		}
@@ -97,7 +98,7 @@ ASTNode *parse_command(Parser *p) {
         if(current(p).token_type == TOKEN_WORD) {
         	r.file = strdup(current(p).value);
         } else {
-        	fprintf(stderr, "No filepath after redirection\n");
+        	fprintf(stderr, BR_RED "No filepath after redirection" RESET "\n");
         	return NULL;
         }
 
